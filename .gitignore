@@ -1,0 +1,21 @@
+**/*venv*
+__pycache__
+**/*.sqlite3
+.env
+**/*.pem
+**/.idea
+.coverage
+.vscode
+.idea
+**/*.crt
+**/*.key
+staticfiles/
+static/
+.__mf__temp/
+.DS_Store
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/config.yml
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
