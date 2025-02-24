@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pmd"
+version = "0.0.0"
+description = ""
+authors = [
+    { name = "TechServ Engineering Team", email = "engineering@techserv.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "Django==5.*"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["pmd"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
