@@ -1,1 +1,1 @@
-from views import GenericTableView
+from .views import GenericTableView
