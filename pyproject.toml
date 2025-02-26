@@ -13,7 +13,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "Django==5.*"
+    "Django==5.*",
+    "generic-table==1.*"
 ]
 
 [tool.hatch.build.targets.wheel]

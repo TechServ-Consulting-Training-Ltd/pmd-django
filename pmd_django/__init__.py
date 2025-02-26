@@ -1,1 +1,1 @@
-# Empty File
+from views import GenericTableView
