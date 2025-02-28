@@ -20,6 +20,15 @@ class Command(BaseCommand):
             if completed and completed.returncode != 0:
                 raise CommandError("Unable to build frontend")
 
+        def dev():
+            completed = None
+            try:
+                completed = subprocess.run("npm run dev", shell=True)
+            except KeyboardInterrupt:
+                pass
+            if completed and completed.returncode != 0:
+                raise CommandError(f"Unable to run npm run dev: {completed.stdout}")
+
         def serve():
             completed = None
             try:
@@ -30,8 +39,15 @@ class Command(BaseCommand):
                 raise CommandError("Unable to build frontend")
 
         try:
+            server_command = None
+            with open("package.json") as f:
+                if "\"main\"" in f.read():
+                    server_command = build
+                else:
+                    server_command = dev
+
             with futures.ThreadPoolExecutor(max_workers=2) as executor:
-                executor.submit(build)
+                executor.submit(server_command)
                 executor.submit(serve)
         except KeyboardInterrupt:
             pass
