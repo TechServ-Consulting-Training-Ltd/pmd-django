@@ -11,43 +11,27 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         os.chdir("./frontend")
 
-        def build():
-            completed = None
-            try:
-                completed = subprocess.run("npm run build", shell=True)
-            except KeyboardInterrupt:
-                pass
-            if completed and completed.returncode != 0:
-                raise CommandError("Unable to build frontend")
-
-        def dev():
+        def frontend():
             completed = None
             try:
                 completed = subprocess.run("npm run dev", shell=True)
             except KeyboardInterrupt:
                 pass
             if completed and completed.returncode != 0:
-                raise CommandError(f"Unable to run npm run dev: {completed.stdout}")
+                raise CommandError("Unable to start dev server")
 
-        def serve():
+        def backend():
             completed = None
             try:
                 completed = subprocess.run("python ../manage.py runserver", shell=True)
             except KeyboardInterrupt:
                 pass
             if completed and completed.returncode != 0:
-                raise CommandError("Unable to build frontend")
+                raise CommandError("Unable to start the backend")
 
         try:
-            server_command = None
-            with open("package.json") as f:
-                if "\"main\"" in f.read():
-                    server_command = build
-                else:
-                    server_command = dev
-
             with futures.ThreadPoolExecutor(max_workers=2) as executor:
-                executor.submit(server_command)
-                executor.submit(serve)
+                executor.submit(frontend)
+                executor.submit(backend)
         except KeyboardInterrupt:
             pass
