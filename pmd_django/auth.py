@@ -4,7 +4,10 @@ from django.http import HttpRequest, HttpResponse
 
 def api_key_middleware(get_response):
     def _(request: HttpRequest):
-        request.current_user = request.headers.get("TS-USER", "system")
+        request.current_user = "system"
+        for k, v in request.headers.items():
+            if k.lower() == "ts-user":
+                request.current_user = v
 
         if settings.DEBUG:
             return get_response(request)
