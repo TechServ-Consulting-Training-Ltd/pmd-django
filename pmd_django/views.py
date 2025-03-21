@@ -1,12 +1,25 @@
+from typing import TypeAlias, Tuple, Optional
 from django.views import View
 from django.db.models import QuerySet
 from django.core.exceptions import ImproperlyConfigured
 from generic_table.generic_table import view
 
+FrontendFieldOptions: TypeAlias = dict
+FrontendFieldType: TypeAlias = str
+FrontendHeaderDisplayName: TypeAlias = str
+BackendAttributeName: TypeAlias = str
+FrontendHeaderSettings: TypeAlias = Tuple[FrontendHeaderDisplayName, Tuple[FrontendFieldType, FrontendFieldOptions]]
+StageDisplayValue: TypeAlias = str
+StageDBValue: TypeAlias = str
+
+
 class GenericTableView(View):
-    generic_table_view_kwargs = {}
     queryset = None
     model = None
+    stage_field: str = ""
+    counted_stages: dict[StageDisplayValue, StageDBValue] = {}
+    should_add_all: bool = True
+    table_headers: dict[BackendAttributeName, Optional[FrontendHeaderSettings]] = {}
 
     # https://github.com/django/django/blob/5a1cae3a5675c5733daf5949759476d65aa0e636/django/views/generic/list.py#L22C5-L48C1
     def get_queryset(self):
@@ -24,10 +37,31 @@ class GenericTableView(View):
             )
         return queryset
 
-
     def get(self, request, *args, **kwargs):
         return view(
             qs=self.get_queryset(),
             request=request,
             **self.generic_table_view_kwargs
         )
+
+    @property
+    def generic_table_view_kwargs(self):
+        return {
+            "field": self.stage_field,
+            "values_list": list(self.table_headers.keys()),
+            "counted_values": list(self.counted_stages.values()),
+            "data_key": "data",
+            "final_json_hook": self.final_json_hook,
+        }
+
+    def final_json_hook(self, data: dict) -> dict:
+        counted_stages = self.counted_stages
+        if self.should_add_all:
+            counted_stages = {"All": "ALL"} | self.counted_stages
+        data["displayStageAttr"] = self.stage_field
+        data["displayStages"] = counted_stages
+        data["displayHeaders"] = {k: v[0] for k, v in self.table_headers.items() if v}
+        data["filterFieldTypes"] = {
+            k: v[1][0] for k, v in self.table_headers.items() if v
+        }
+        return data
