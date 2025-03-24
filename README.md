@@ -30,3 +30,6 @@ MIDDLEWARE = [
 4. Optionally add `USER_AUTH_FILTERS` to `settings.py`. This should be a list of
 functions that will get passed a `request` object. The function should return true if the
 middleware should authorize the `request`.
+
+## Testing
+Run `python manage.py test` from the root of the project to run the tests.
