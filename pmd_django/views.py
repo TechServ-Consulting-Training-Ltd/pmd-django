@@ -2,7 +2,7 @@ from typing import TypeAlias, Tuple, Optional
 from django.views import View
 from django.db.models import QuerySet
 from django.core.exceptions import ImproperlyConfigured
-from generic_table.generic_table import view
+from pmd_django.generic_table.generic_table import view
 
 FrontendFieldOptions: TypeAlias = dict
 FrontendFieldType: TypeAlias = str

@@ -7,7 +7,7 @@ from django.http import FileResponse, JsonResponse
 from django.test import RequestFactory, TestCase
 from openpyxl.reader.excel import load_workbook
 
-from generic_table.generic_table import (
+from pmd_django.generic_table.generic_table import (
     _apply_filters,
     _apply_ordering,
     _apply_user_filters,
