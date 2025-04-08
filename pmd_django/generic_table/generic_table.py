@@ -226,16 +226,23 @@ def paginate_queryset(qs, request, page_size=None):
     return _paginate_queryset(qs, request, page_size)
 
 
-def _generate_download_response(qs, values_list):
+def _generate_download_response(qs, values_list, transform=None):
     wb = Workbook()
     worksheet = wb.active
     worksheet.title = "Exported Data"
 
-    headers = values_list if values_list else qs.values()[0].keys()
-    worksheet.append(headers)
+    if transform:
+        data = transform(qs)
+    else:
+        data = list(qs.values(*values_list)) if values_list else list(qs.values())
 
-    for obj in qs.values(*values_list) if values_list else qs.values():
-        worksheet.append([obj[field] for field in headers])
+    if not data:
+        worksheet.append(["No data"])
+    else:
+        headers = list(data[0].keys())
+        worksheet.append(headers)
+        for row in data:
+            worksheet.append([row.get(field) for field in headers])
 
     output = io.BytesIO()
     wb.save(output)
@@ -283,7 +290,7 @@ def view(
         in accept_header
     )
     if is_excel:
-        return _generate_download_response(qs, values_list)
+        return _generate_download_response(qs, values_list, transform=transform)
 
     # Paginate the filtered and sorted queryset
     page_obj, paginator = paginate_queryset(qs, request, page_size)
