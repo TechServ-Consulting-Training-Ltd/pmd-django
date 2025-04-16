@@ -5,8 +5,8 @@ from django.http import JsonResponse
 from jwcrypto import jwk, jws
 from pmd_django.auth import api_key_middleware
 
-permissions = {"permissions": [{"resource": "all", "role": "dev"}]}
-payload = json.dumps(permissions)
+identity = {"email": "dev@techserv.com", "permissions": [{"resource": "all", "role": "dev"}]}
+payload = json.dumps(identity)
 
 key = jwk.JWK.generate(kty="OKP", crv="Ed25519")
 public_jwk_b64 = base64.b64encode(key.export_public().encode("utf-8")).decode("utf-8")
@@ -21,31 +21,23 @@ class TestAuthMiddleware(TestCase):
         self.factory = RequestFactory()
 
         def dummy_view(request):
-            return JsonResponse({
-                "current_user": getattr(request, "current_user", None),
-                "permissions": getattr(request, "user_permissions", None),
-            })
+            return JsonResponse(request.identity)
 
         self.middleware = api_key_middleware(dummy_view)
 
     def test_valid_signed_permissions(self):
         request = self.factory.get("/")
-        request.COOKIES["signedPermissions"] = signed_token
-        request.COOKIES["permissions"] = payload
-        request.COOKIES["email"] = "dev@example.com"
+        request.COOKIES["signedIdentity"] = signed_token
 
         response = self.middleware(request)
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
 
-        self.assertEqual(data["current_user"], "dev@example.com")
-        self.assertEqual(data["permissions"], permissions)
+        self.assertEqual(data, identity)
 
     def test_invalid_signature(self):
         request = self.factory.get("/")
-        request.COOKIES["signedPermissions"] = "bad.token.value"
-        request.COOKIES["permissions"] = payload
-        request.COOKIES["email"] = "dev@example.com"
+        request.COOKIES["signedIdentity"] = "bad.token.value"
 
         response = self.middleware(request)
         self.assertEqual(response.status_code, 401)
