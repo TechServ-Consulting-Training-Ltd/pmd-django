@@ -27,8 +27,11 @@ def api_key_middleware(get_response):
                     jws_token.verify(key)
 
                     identity = json_decode(jws_token.payload)
+
                     request.identity = identity
-                    return get_response(request)
+                    for p in identity["permissions"]:
+                        if p['resource'] in (settings.APP_NAME, 'all'):
+                            return get_response(request)
 
             except Exception:
                 res = HttpResponse("Not authenticated")

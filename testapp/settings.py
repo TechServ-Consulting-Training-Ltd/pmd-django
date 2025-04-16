@@ -1,5 +1,7 @@
 import os
 
+APP_NAME = "aep"
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
