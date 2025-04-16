@@ -2,18 +2,11 @@ import base64
 import json
 from django.test import TestCase, RequestFactory, override_settings
 from django.http import JsonResponse
-from jwcrypto import jwk, jws
-from pmd_django.auth import api_key_middleware
+from pmd_django.auth import api_key_middleware, generate_identity
 
 identity = {"email": "dev@techserv.com", "permissions": [{"resource": "all", "role": "dev"}]}
+(public_jwk_b64, signed_token) = generate_identity(identity)
 payload = json.dumps(identity)
-
-key = jwk.JWK.generate(kty="OKP", crv="Ed25519")
-public_jwk_b64 = base64.b64encode(key.export_public().encode("utf-8")).decode("utf-8")
-
-signed = jws.JWS(payload.encode("utf-8"))
-signed.add_signature(key, None, protected=json.dumps({"alg": "EdDSA"}))
-signed_token = signed.serialize(compact=True)
 
 @override_settings(AUTH_PUBLIC_KEY=public_jwk_b64)
 class TestAuthMiddleware(TestCase):
