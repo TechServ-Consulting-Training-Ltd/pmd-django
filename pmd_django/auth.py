@@ -12,6 +12,9 @@ def api_key_middleware(get_response):
         if request.path.endswith("health") or request.path.endswith("health/"):
             return get_response(request)
 
+        if request.path.endswith("identity") or request.path.endswith("identity/"):
+            return get_response(request)
+
         if request.method == "OPTIONS":
             return HttpResponse("Good for preflight")
 
