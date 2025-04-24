@@ -13,6 +13,9 @@ def api_key_middleware(get_response):
             return get_response(request)
 
         if request.path.endswith("identity") or request.path.endswith("identity/"):
+            signed_identity = request.COOKIES.get("signedIdentity")
+            if not signed_identity:
+                return HttpResponse("Missing signedIdentity", status=401)
             return get_response(request)
 
         if request.method == "OPTIONS":
