@@ -1,7 +1,8 @@
-import base64
 import json
-from django.test import TestCase, RequestFactory, override_settings
+
 from django.http import JsonResponse
+from django.test import TestCase, RequestFactory, override_settings
+
 from pmd_django.auth import api_key_middleware, generate_identity
 
 identity = {"email": "dev@techserv.com", "permissions": [{"resource": "all", "role": "dev"}]}
