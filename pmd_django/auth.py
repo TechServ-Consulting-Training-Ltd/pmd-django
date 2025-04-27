@@ -18,6 +18,9 @@ def api_key_middleware(get_response):
                 return HttpResponse("Missing signedIdentity", status=401)
             return get_response(request)
 
+        if request.path.endswith(("logout", "logout/")):
+            return get_response(request)
+
         if request.method == "OPTIONS":
             return HttpResponse("Good for preflight")
 

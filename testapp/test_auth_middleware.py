@@ -15,7 +15,7 @@ class TestAuthMiddleware(TestCase):
         self.factory = RequestFactory()
 
         def dummy_view(request):
-            return JsonResponse(request.identity)
+            return JsonResponse(request.identity if hasattr(request, "identity") else {})
 
         self.middleware = api_key_middleware(dummy_view)
 
@@ -40,3 +40,9 @@ class TestAuthMiddleware(TestCase):
         request = self.factory.get("/")
         response = self.middleware(request)
         self.assertEqual(response.status_code, 401)
+
+    def test_logout_bypasses_auth(self):
+        request = self.factory.post("/logout")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 200)
