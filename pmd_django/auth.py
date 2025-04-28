@@ -30,7 +30,7 @@ def api_key_middleware(get_response):
         if request.method == "OPTIONS":
             return HttpResponse("Good for preflight")
 
-        signed_identity = request.COOKIES.get("signedIdentity")
+        signed_identity = request.COOKIES.get("signedIdentity") or request.META.get("HTTP_SIGNED_IDENTITY")
 
         if signed_identity:
             try:
