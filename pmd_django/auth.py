@@ -13,9 +13,15 @@ def api_key_middleware(get_response):
             return get_response(request)
 
         if request.path.endswith("identity") or request.path.endswith("identity/"):
+            # This is for local dev, in non-local API-Gateway maps this to a header.
             signed_identity = request.COOKIES.get("signedIdentity")
             if not signed_identity:
+                # API Gateway.
+                signed_identity = request.META.get("HTTP_SIGNED_IDENTITY")
+
+            if not signed_identity:
                 return HttpResponse("Missing signedIdentity", status=401)
+
             return get_response(request)
 
         if request.path.endswith(("logout", "logout/")):
