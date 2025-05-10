@@ -1,11 +1,14 @@
 import io
 import json
+from datetime import datetime, timezone
 
 from django.db.models import Count
 from django.http import FileResponse, JsonResponse
 from django.test import RequestFactory, TestCase
+from django.utils.timezone import now
 from openpyxl.reader.excel import load_workbook
 
+from pmd_django import GenericTableView
 from pmd_django.generic_table.generic_table import (
     _apply_filters,
     _apply_ordering,
@@ -246,16 +249,14 @@ class TestGenericTable(TestCase):
         self.assertIn("status_count", allowed_fields)
 
     def test_values_fields(self):
-        qs = TestModel.objects.values(
-            "id", "status"
-        )  # Only these fields should be allowed
+        qs = TestModel.objects.values("id", "status")
+        qs.extra_allowed_fields = {"id", "status"}
+
         allowed_fields = _get_allowed_fields(qs)
 
         self.assertIn("id", allowed_fields)
         self.assertIn("status", allowed_fields)
-        self.assertNotIn(
-            "created_at", allowed_fields
-        )  # Not in `.values()`, so should be rejected
+        self.assertNotIn("nope", allowed_fields)
 
     def test_rejects_unauthorized_fields(self):
         qs = TestModel.objects.all()
@@ -301,20 +302,7 @@ class TestGenericTable(TestCase):
         values_list = ["status"]
 
         response = _generate_download_response(queryset, values_list)
-
-        self.assertIsInstance(response, FileResponse)
-        self.assertEqual(
-            response["Content-Type"],
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-        response_content = io.BytesIO()
-        for chunk in response.streaming_content:
-            response_content.write(chunk)
-        response_content.seek(0)
-
-        workbook = load_workbook(response_content)
-        worksheet = workbook.active
+        worksheet = self._load_excel_from_response(response)
 
         expected_headers = ["status"]
         headers = [cell.value for cell in worksheet[1]]
@@ -329,3 +317,72 @@ class TestGenericTable(TestCase):
             ("active",),
         ]
         self.assertEqual(data_rows, expected_data)
+
+    def test_generate_excel_response_with_list_field(self):
+        TestModel.objects.create(status="tagged", tags=["TEST", "ALPHA"])
+
+        queryset = TestModel.objects.filter(status="tagged")
+        values_list = ["status", "tags"]
+
+        response = _generate_download_response(queryset, values_list)
+        worksheet = self._load_excel_from_response(response)
+
+        headers = [cell.value for cell in worksheet[1]]
+        self.assertEqual(headers, ["status", "tags"])
+
+        data_row = list(worksheet.iter_rows(min_row=2, max_row=2, values_only=True))[0]
+        self.assertEqual(data_row[0], "tagged")
+        self.assertIsInstance(data_row[1], str)
+        self.assertIn("TEST", data_row[1])
+        self.assertIn("ALPHA", data_row[1])
+
+    def test_generate_excel_response_with_timezone_datetime(self):
+        aware_datetime = now().astimezone(timezone.utc)
+        TestModel.objects.create(status="datetime", created_at=aware_datetime)
+
+        queryset = TestModel.objects.filter(status="datetime")
+        values_list = ["status", "created_at"]
+
+        response = _generate_download_response(queryset, values_list)
+        worksheet = self._load_excel_from_response(response)
+
+        headers = [cell.value for cell in worksheet[1]]
+        self.assertEqual(headers, ["status", "created_at"])
+
+        data_row = list(worksheet.iter_rows(min_row=2, max_row=2, values_only=True))[0]
+        self.assertEqual(data_row[0], "datetime")
+        self.assertIsInstance(data_row[1], datetime)
+        self.assertIsNone(data_row[1].tzinfo, "Datetime should be naive (tzinfo=None)")
+
+    def _load_excel_from_response(self, response: FileResponse):
+        self.assertIsInstance(response, FileResponse)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        output = io.BytesIO()
+        for chunk in response.streaming_content:
+            output.write(chunk)
+        output.seek(0)
+
+        workbook = load_workbook(output)
+        worksheet = workbook.active
+        return worksheet
+
+    def test_fields_with_none_headers_not_exported(self):
+        class DummyView(GenericTableView):
+            model = TestModel
+            stage_field = "status"
+            table_headers = {
+                "status": ("Status", ("default", {})),
+                "created_at": None,  # Should not be exported
+            }
+
+        request = self.factory.get("/", HTTP_ACCEPT="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        view_instance = DummyView()
+        response = view_instance.get(request)
+
+        worksheet = self._load_excel_from_response(response)
+        headers = [cell.value for cell in worksheet[1]]
+        self.assertEqual(headers, ["status"])

@@ -1,6 +1,7 @@
 import io
 import json
 import operator
+from datetime import datetime
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Q
@@ -35,9 +36,6 @@ def _get_page_size(request, page_size):
 
 
 def _apply_filters(qs, request, extra_filters=None, extra_filter_from_request=None):
-    """
-    Applies static filters and additional filters derived from the request parameters.
-    """
     if extra_filters:
         qs = qs.filter(extra_filters)
     if extra_filter_from_request:
@@ -49,9 +47,6 @@ def _apply_filters(qs, request, extra_filters=None, extra_filter_from_request=No
 
 
 def _get_allowed_fields(qs):
-    """
-    Retrieves allowed fields for filtering, including related model fields and dynamically added fields.
-    """
     model = qs.model
 
     # Get direct fields from the model
@@ -88,9 +83,6 @@ def _get_allowed_fields(qs):
 
 
 def _apply_user_filters(qs, request):
-    """
-    Applies dynamic user-defined filters from the request.
-    """
     user_filters = request.GET.get("user_filters")
     if not user_filters:
         return qs
@@ -128,7 +120,6 @@ def _apply_user_filters(qs, request):
         condition = f.get("condition")
         value = f.get("value")
 
-        # Skip invalid filters
         if not field or not condition or value in [None, ""]:
             continue
 
@@ -151,7 +142,6 @@ def _apply_user_filters(qs, request):
                 }.get(f["logicalOperator"], operator.and_)  # Default to AND if invalid
             )
 
-    # Return QuerySet early if no valid filters exist
     if not queries:
         return qs
 
@@ -168,9 +158,6 @@ def _apply_user_filters(qs, request):
 
 
 def _apply_ordering(qs, request):
-    """
-    Applies sorting based on request parameters.
-    """
     sort_by = request.GET.get("sort_by", "id")
     sort_order = request.GET.get("sort_order", "asc")
     ordering = f"-{sort_by}" if sort_order == "desc" else sort_by
@@ -178,9 +165,6 @@ def _apply_ordering(qs, request):
 
 
 def _paginate_queryset(qs, request, page_size):
-    """
-    Handles pagination logic.
-    """
     paginator = Paginator(qs, page_size)
     page = request.GET.get("page", 1)
     try:
@@ -201,9 +185,6 @@ def apply_all_filters(
     extra_filters=None,
     extra_filter_from_request=None,
 ):
-    """
-    Applies all relevant filtering, including user filters, extra filters, and field-based filtering.
-    """
     qs = _apply_user_filters(qs, request)
 
     qs = _apply_filters(qs, request, extra_filters, extra_filter_from_request)
@@ -219,12 +200,17 @@ def apply_all_filters(
 
 
 def paginate_queryset(qs, request, page_size=None):
-    """
-    Handles pagination separately.
-    """
     page_size = _get_page_size(request, page_size)
     return _paginate_queryset(qs, request, page_size)
 
+def _sanitize_cell_value(value):
+    if isinstance(value, list):
+        return ", ".join(map(str, value))
+    elif isinstance(value, dict):
+        return json.dumps(value)
+    elif isinstance(value, datetime) and value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
 
 def _generate_download_response(qs, values_list, transform=None):
     wb = Workbook()
@@ -234,7 +220,8 @@ def _generate_download_response(qs, values_list, transform=None):
     if transform:
         data = transform(qs)
     else:
-        data = list(qs.values(*values_list)) if values_list else list(qs.values())
+        fields = values_list or getattr(qs, "extra_allowed_fields", [])
+        data = list(qs.values(*fields))
 
     if not data:
         worksheet.append(["No data"])
@@ -242,7 +229,7 @@ def _generate_download_response(qs, values_list, transform=None):
         headers = list(data[0].keys())
         worksheet.append(headers)
         for row in data:
-            worksheet.append([row.get(field) for field in headers])
+            worksheet.append([_sanitize_cell_value(row.get(field)) for field in headers])
 
     output = io.BytesIO()
     wb.save(output)
@@ -269,21 +256,14 @@ def view(
     transform=None,
     final_json_hook=None,
 ) -> JsonResponse | FileResponse:
-    """
-    Orchestrates filtering and pagination for a queryset based on request parameters.
-    """
-    # Add lookups that user can see to permitted filter fields
     qs.extra_allowed_fields = values_list if values_list is not None else []
 
-    # Apply filters and get counts
     qs, counts = apply_all_filters(
         qs, request, field, counted_values, extra_filters, extra_filter_from_request
     )
 
-    # Apply sorting
     qs = _apply_ordering(qs, request)
 
-    # Handle download request
     accept_header = request.headers.get("Accept", "")
     is_excel = (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -292,10 +272,8 @@ def view(
     if is_excel:
         return _generate_download_response(qs, values_list, transform=transform)
 
-    # Paginate the filtered and sorted queryset
     page_obj, paginator = paginate_queryset(qs, request, page_size)
 
-    # Extract required data
     if transform:
         data = transform(page_obj)
     else:
@@ -320,5 +298,4 @@ def view(
     if final_json_hook:
         return_data = final_json_hook(return_data)
 
-    # Construct response
     return JsonResponse(return_data)
