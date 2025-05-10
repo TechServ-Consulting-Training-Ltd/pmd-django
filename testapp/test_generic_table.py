@@ -1,7 +1,6 @@
 import io
 import json
 
-from django.db import connection
 from django.db.models import Count
 from django.http import FileResponse, JsonResponse
 from django.test import RequestFactory, TestCase
@@ -25,11 +24,6 @@ class TestGenericTable(TestCase):
     def setUpTestData(cls):
         cls.factory = RequestFactory()
 
-        # Create the table at runtime without migrations
-        with connection.schema_editor() as schema_editor:
-            schema_editor.create_model(TestModel)
-            schema_editor.create_model(TestRelatedModel)
-
         tm = TestModel.objects.create(status="active")
 
         TestModel.objects.bulk_create(
@@ -42,12 +36,6 @@ class TestGenericTable(TestCase):
         )
 
         TestRelatedModel.objects.create(name="Related Item", related=tm)
-
-    @classmethod
-    def tearDownClass(cls):
-        with connection.schema_editor() as schema_editor:
-            schema_editor.delete_model(TestModel)
-        super().tearDownClass()
 
     def test_build_counts(self):
         counted_values = ["active", "inactive", "pending"]
@@ -77,18 +65,23 @@ class TestGenericTable(TestCase):
     def test_apply_ordering(self):
         request = self.factory.get("/?sort_by=id&sort_order=desc")
         ordered_qs = _apply_ordering(TestModel.objects.all(), request)
-        self.assertEqual(ordered_qs.first().id, 5)
+        ids = list(ordered_qs.values_list("id", flat=True))
+        self.assertEqual(ids, sorted(ids, reverse=True))
 
     def test_paginate_queryset(self):
         request = self.factory.get("/?page=2&page_size=2")
         queryset = TestModel.objects.all().order_by("id")
 
         page_obj, paginator = _paginate_queryset(queryset, request, 2)
+
         self.assertEqual(page_obj.number, 2)
         self.assertEqual(paginator.num_pages, 3)
-        self.assertEqual(
-            list(page_obj.object_list.values_list("id", flat=True)), [3, 4]
-        )
+
+        all_ids = list(TestModel.objects.all().order_by("id").values_list("id", flat=True))
+        expected_ids = all_ids[2:4]  # page 2, page_size 2
+        actual_ids = list(page_obj.object_list.values_list("id", flat=True))
+
+        self.assertEqual(actual_ids, expected_ids)
 
     def test_view(self):
         request = self.factory.get("/?page=1&sort_by=id")
