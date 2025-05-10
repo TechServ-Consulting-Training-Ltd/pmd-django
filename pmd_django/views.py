@@ -1,7 +1,5 @@
-import json
 from typing import TypeAlias, Tuple, Optional
 
-from django.http import JsonResponse
 from django.views import View
 from django.db.models import QuerySet
 from django.core.exceptions import ImproperlyConfigured
@@ -70,34 +68,16 @@ class GenericTableView(View):
         }
         return data
 
-    @classmethod
-    def bulk(cls, request, update_fn=None):
-        if request.method != "POST":
-            return JsonResponse({"error": "POST only"}, status=405)
-
-        try:
-            payload = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-        self = cls()
-        qs = self.get_queryset()
+    @staticmethod
+    def bulk(request, view_class, query, update_fn):
+        self = view_class()
 
         filtered_qs = build_filtered_queryset(
-            qs,
-            payload,
+            self.get_queryset(),
+            query,
             field=self.stage_field,
             counted_values=list(self.counted_stages.values()),
             extra_filter_from_request=self.generic_table_view_kwargs.get("extra_filter_from_request"),
         )
 
-        if update_fn is None:
-            return JsonResponse({"error": "No update_fn provided"}, status=400)
-
-        updated_count = update_fn(filtered_qs)
-
-        return JsonResponse({
-            "status": "success",
-            "updated_count": updated_count,
-            "query_count": filtered_qs.count(),
-        })
+        return update_fn(filtered_qs)
