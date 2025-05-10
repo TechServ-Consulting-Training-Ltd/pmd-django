@@ -5,15 +5,21 @@ class TestModel(models.Model):
     status = models.CharField(max_length=100)
 
     class Meta:
-        managed = False
         db_table = "test_model"
-        app_label = 'testapp'  # Explicitly set the app_label
+        app_label = 'testapp'
 
 class TestRelatedModel(models.Model):
     name = models.TextField()
     related = models.ForeignKey(TestModel, on_delete=models.CASCADE)
 
     class Meta:
-        managed = False
         db_table = "test_related_model"
+        app_label = 'testapp'
+
+class UniqueModel(models.Model):
+    code = models.TextField(unique=True)
+    related = models.ForeignKey("testapp.TestRelatedModel", on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        db_table = "test_unique_model"
         app_label = 'testapp'
