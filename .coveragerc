@@ -1,0 +1,3 @@
+[report]
+omit =
+    pmd_django/views.py
