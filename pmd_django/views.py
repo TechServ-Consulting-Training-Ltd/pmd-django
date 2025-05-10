@@ -48,9 +48,18 @@ class GenericTableView(View):
 
     @property
     def generic_table_view_kwargs(self):
+        json_fields = list(self.table_headers.keys())
+        if "id" not in json_fields:
+            json_fields.append("id")
+
+        download_fields = [k for k, v in self.table_headers.items() if v is not None]
+        if "id" not in download_fields:
+            download_fields.append("id")
+
         return {
             "field": self.stage_field,
-            "values_list": [k for k, v in self.table_headers.items() if v is not None],
+            "values_list": json_fields,
+            "download_fields": download_fields,
             "counted_values": list(self.counted_stages.values()),
             "data_key": "data",
             "final_json_hook": self.final_json_hook,
