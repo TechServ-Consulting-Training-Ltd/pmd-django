@@ -354,35 +354,59 @@ class TestGenericTable(TestCase):
         self.assertIsInstance(data_row[1], datetime)
         self.assertIsNone(data_row[1].tzinfo, "Datetime should be naive (tzinfo=None)")
 
-    def _load_excel_from_response(self, response: FileResponse):
-        self.assertIsInstance(response, FileResponse)
-        self.assertEqual(
-            response["Content-Type"],
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-        output = io.BytesIO()
-        for chunk in response.streaming_content:
-            output.write(chunk)
-        output.seek(0)
-
-        workbook = load_workbook(output)
-        worksheet = workbook.active
-        return worksheet
-
-    def test_fields_with_none_headers_not_exported(self):
+    def test_json_and_excel_field_handling(self):
         class DummyView(GenericTableView):
             model = TestModel
             stage_field = "status"
             table_headers = {
+                "id": None,
                 "status": ("Status", ("default", {})),
-                "created_at": None,  # Should not be exported
+                "created_at": None,
             }
 
-        request = self.factory.get("/", HTTP_ACCEPT="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        view_instance = DummyView()
-        response = view_instance.get(request)
+            @property
+            def generic_table_view_kwargs(self):
+                return {
+                    "field": self.stage_field,
+                    "values_list": list(self.table_headers.keys()),
+                    "download_fields": [k for k, v in self.table_headers.items() if v is not None or k == "id"],
+                    "counted_values": [],
+                    "data_key": "data",
+                    "final_json_hook": self.final_json_hook,
+                }
 
-        worksheet = self._load_excel_from_response(response)
+            def final_json_hook(self, data):
+                data["displayHeaders"] = {k: v[0] for k, v in self.table_headers.items() if v}
+                data["filterFieldTypes"] = {
+                    k: v[1][0] for k, v in self.table_headers.items() if v
+                }
+                return data
+
+        # Excel export should only include 'id' and 'status'
+        excel_request = self.factory.get("/", HTTP_ACCEPT="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        view_instance = DummyView()
+        excel_response = view_instance.get(excel_request)
+        worksheet = self._load_excel_from_response(excel_response)
         headers = [cell.value for cell in worksheet[1]]
-        self.assertEqual(headers, ["status"])
+        self.assertEqual(headers, ["id", "status"])
+
+        # JSON export should include all table_headers keys (even those with None)
+        json_request = self.factory.get("/")
+        json_response = view_instance.get(json_request)
+        data = json.loads(json_response.content)["data"][0]
+        self.assertIn("id", data)
+        self.assertIn("status", data)
+        self.assertIn("created_at", data)
+
+    def _load_excel_from_response(self, response: FileResponse):
+        self.assertIsInstance(response, FileResponse)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        output = io.BytesIO()
+        for chunk in response.streaming_content:
+            output.write(chunk)
+        output.seek(0)
+        workbook = load_workbook(output)
+        return workbook.active

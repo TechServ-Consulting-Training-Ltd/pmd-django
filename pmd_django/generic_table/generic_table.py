@@ -255,6 +255,7 @@ def view(
     page_size=None,
     transform=None,
     final_json_hook=None,
+    download_fields=None,
 ) -> JsonResponse | FileResponse:
     qs.extra_allowed_fields = values_list if values_list is not None else []
 
@@ -270,7 +271,7 @@ def view(
         in accept_header
     )
     if is_excel:
-        return _generate_download_response(qs, values_list, transform=transform)
+        return _generate_download_response(qs, download_fields or values_list, transform=transform)
 
     page_obj, paginator = paginate_queryset(qs, request, page_size)
 
