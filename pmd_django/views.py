@@ -50,7 +50,7 @@ class GenericTableView(View):
     def generic_table_view_kwargs(self):
         return {
             "field": self.stage_field,
-            "values_list": list(self.table_headers.keys()),
+            "values_list": [k for k, v in self.table_headers.items() if v is not None],
             "counted_values": list(self.counted_stages.values()),
             "data_key": "data",
             "final_json_hook": self.final_json_hook,

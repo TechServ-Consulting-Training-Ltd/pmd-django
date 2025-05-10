@@ -1,8 +1,12 @@
 from django.db import models
+from django.utils.timezone import now
 
 
 class TestModel(models.Model):
     status = models.CharField(max_length=100)
+    tags = models.JSONField(default=list)
+    created_at = models.DateTimeField(default=now)
+    metadata_not_for_download = models.TextField()
 
     class Meta:
         db_table = "test_model"
