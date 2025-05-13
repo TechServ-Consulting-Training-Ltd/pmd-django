@@ -4,7 +4,8 @@ import operator
 from datetime import datetime
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, Q, CharField, TextField
+from django.db.models.functions import Lower
 from django.http import FileResponse, JsonResponse
 from openpyxl.workbook import Workbook
 
@@ -160,7 +161,20 @@ def _apply_user_filters(qs, request):
 def _apply_ordering(qs, request):
     sort_by = request.GET.get("sort_by", "id")
     sort_order = request.GET.get("sort_order", "asc")
-    ordering = f"-{sort_by}" if sort_order == "desc" else sort_by
+    base_field = sort_by.lstrip("-")
+
+    model_field = None
+    try:
+        model_field = qs.model._meta.get_field(base_field)
+    except Exception:
+        pass
+
+    if isinstance(model_field, (CharField, TextField)):
+        annotation_name = f"__lower_{base_field}"
+        qs = qs.annotate(**{annotation_name: Lower(base_field)})
+        base_field = annotation_name
+
+    ordering = f"-{base_field}" if sort_order == "desc" else base_field
     return qs.order_by(ordering or COMMON_RESPONSE_DEFAULTS.get("ordering", "id"))
 
 
