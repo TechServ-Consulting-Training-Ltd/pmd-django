@@ -65,12 +65,6 @@ class TestGenericTable(TestCase):
         )
         self.assertTrue(filtered_qs.exists())
 
-    def test_apply_ordering(self):
-        request = self.factory.get("/?sort_by=id&sort_order=desc")
-        ordered_qs = _apply_ordering(TestModel.objects.all(), request)
-        ids = list(ordered_qs.values_list("id", flat=True))
-        self.assertEqual(ids, sorted(ids, reverse=True))
-
     def test_paginate_queryset(self):
         request = self.factory.get("/?page=2&page_size=2")
         queryset = TestModel.objects.all().order_by("id")
@@ -410,3 +404,20 @@ class TestGenericTable(TestCase):
         output.seek(0)
         workbook = load_workbook(output)
         return workbook.active
+
+    def test_apply_ordering_id(self):
+        request = self.factory.get("/?sort_by=id&sort_order=desc")
+        ordered_qs = _apply_ordering(TestModel.objects.all(), request)
+        ids = list(ordered_qs.values_list("id", flat=True))
+        self.assertEqual(ids, sorted(ids, reverse=True))
+
+    def test_apply_ordering_case_insensitive_for_strings(self):
+        TestModel.objects.create(status="Beta")
+        TestModel.objects.create(status="alpha")
+        TestModel.objects.create(status="Gamma")
+
+        request = self.factory.get("/?sort_by=status&sort_order=asc")
+        ordered_qs = _apply_ordering(TestModel.objects.all(), request)
+        ordered_statuses = list(ordered_qs.values_list("status", flat=True))
+
+        self.assertEqual(ordered_statuses, sorted(ordered_statuses, key=lambda s: s.lower()))
