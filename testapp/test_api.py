@@ -14,6 +14,10 @@ def create_unique_view(request):
     related = TestRelatedModel.objects.first()
     return UniqueModel.objects.create(code=request.json["code"], related=related)
 
+@api()
+def simple_get_view(request):
+    return {"ok": True, "json": request.json}
+
 
 class TestJsonDecoratorWithRelations(TestCase):
     @classmethod
@@ -82,3 +86,12 @@ class TestJsonDecoratorWithRelations(TestCase):
         self.assertIn("errors", data)
         self.assertIn("code", data["errors"])
         self.assertEqual(data["errors"]["code"], ["empty values not allowed"])
+
+    def test_get_request_is_allowed_and_json_is_empty(self):
+        request = self.factory.get("/")
+        response = simple_get_view(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.content)
+        self.assertEqual(data, {"ok": True, "json": {}})
