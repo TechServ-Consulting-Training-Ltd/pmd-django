@@ -87,16 +87,19 @@ def api(rules: dict | None = None):
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
-            data, error_response = _parse_json_body(request)
-            if error_response:
-                return error_response
-
-            if rules:
-                data, error_response = _validate_and_clean_data(data, rules)
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                data, error_response = _parse_json_body(request)
                 if error_response:
                     return error_response
 
-            request.json = data
+                if rules:
+                    data, error_response = _validate_and_clean_data(data, rules)
+                    if error_response:
+                        return error_response
+
+                request.json = data
+            else:
+                request.json = {}
 
             try:
                 result = view_func(request, *args, **kwargs)
@@ -107,3 +110,4 @@ def api(rules: dict | None = None):
 
         return _wrapped_view
     return decorator
+
